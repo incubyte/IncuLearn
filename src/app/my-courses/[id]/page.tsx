@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronDownIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 interface Resource {
   type: string;
@@ -56,6 +58,9 @@ export default function CourseDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeModule, setActiveModule] = useState(0);
+  const [expandedModule, setExpandedModule] = useState<number | null>(0);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   
   const [showingAnswers, setShowingAnswers] = useState(false);
   const [feedback, setFeedback] = useState({
@@ -66,101 +71,10 @@ export default function CourseDetail() {
   useEffect(() => {
     const fetchCourse = async () => {
       try {
-        // In a real app, this would make an API call
-        // For now, we'll just simulate it with a mock response
         setLoading(true);
-        
-        // Mocked data for now
-        setTimeout(() => {
-          const mockCourse: Course = {
-            _id: courseId,
-            userId: 'user123',
-            title: 'Web Development Fundamentals',
-            description: 'A comprehensive course on web development basics',
-            currentLevel: 'Beginner',
-            targetSkill: 'Web Development',
-            learningPath: {
-              modules: [
-                {
-                  title: 'HTML Essentials',
-                  description: 'Learn the fundamentals of HTML structure and elements',
-                  resources: [
-                    {
-                      type: 'article',
-                      title: 'HTML Introduction',
-                      url: 'https://developer.mozilla.org/en-US/docs/Learn/HTML/Introduction_to_HTML',
-                      description: 'A comprehensive guide to HTML basics by MDN'
-                    },
-                    {
-                      type: 'video',
-                      title: 'HTML Crash Course',
-                      url: 'https://www.youtube.com/watch?v=UB1O30fR-EE',
-                      description: 'A quick introduction to HTML elements and structure'
-                    }
-                  ],
-                  assessment: {
-                    questions: [
-                      {
-                        question: 'What does HTML stand for?',
-                        options: [
-                          'Hyper Text Markup Language',
-                          'High Technical Modern Language',
-                          'Hyper Transfer Markup Language',
-                          'Hybrid Text Making Language'
-                        ],
-                        correctAnswer: 'Hyper Text Markup Language'
-                      },
-                      {
-                        question: 'Which tag is used to create a paragraph in HTML?',
-                        options: ['<paragraph>', '<p>', '<para>', '<text>'],
-                        correctAnswer: '<p>'
-                      }
-                    ]
-                  }
-                },
-                {
-                  title: 'CSS Fundamentals',
-                  description: 'Learn how to style web pages with CSS',
-                  resources: [
-                    {
-                      type: 'article',
-                      title: 'CSS Basics',
-                      url: 'https://developer.mozilla.org/en-US/docs/Learn/CSS/First_steps',
-                      description: 'Learn the basics of CSS styling'
-                    },
-                    {
-                      type: 'exercise',
-                      title: 'CSS Selectors Practice',
-                      url: 'https://flukeout.github.io/',
-                      description: 'Interactive game to practice CSS selectors'
-                    }
-                  ],
-                  assessment: {
-                    questions: [
-                      {
-                        question: 'Which property is used to change the text color in CSS?',
-                        options: ['text-color', 'font-color', 'color', 'text-style'],
-                        correctAnswer: 'color'
-                      },
-                      {
-                        question: 'What CSS property is used to add space between elements?',
-                        options: ['spacing', 'margin', 'padding', 'gap'],
-                        correctAnswer: 'margin'
-                      }
-                    ]
-                  }
-                }
-              ]
-            },
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            feedback: []
-          };
-          
-          setCourse(mockCourse);
-          setLoading(false);
-        }, 1000);
-        
+        const response = await axios.get(`/api/course/${courseId}`);
+        setCourse(response.data.course);
+        setLoading(false);
       } catch (err) {
         setError('Failed to fetch course details. Please try again later.');
         console.error(err);
@@ -171,8 +85,21 @@ export default function CourseDetail() {
     fetchCourse();
   }, [courseId]);
 
+  const handleDeleteCourse = async () => {
+    try {
+      setDeleting(true);
+      await axios.delete(`/api/course/${courseId}`);
+      router.push('/my-courses');
+    } catch (error) {
+      console.error('Error deleting course:', error);
+      alert('Failed to delete course. Please try again.');
+      setDeleting(false);
+    }
+  };
+
   const handleModuleChange = (index: number) => {
     setActiveModule(index);
+    setExpandedModule(index);
     setShowingAnswers(false);
   };
 
@@ -232,8 +159,9 @@ export default function CourseDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
         <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
           <p className="text-lg font-medium text-indigo-600">Loading course details...</p>
         </div>
       </div>
@@ -242,12 +170,12 @@ export default function CourseDetail() {
 
   if (error || !course) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center">
         <div className="text-center">
-          <p className="text-lg font-medium text-red-600">{error || 'Course not found'}</p>
+          <p className="text-lg font-medium text-red-600 mb-4">{error || 'Course not found'}</p>
           <button
             onClick={() => router.push('/my-courses')}
-            className="mt-4 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            className="px-6 py-3 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200"
           >
             Back to My Courses
           </button>
@@ -257,196 +185,222 @@ export default function CourseDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50">
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
           <div className="flex justify-between items-center mb-6">
             <Link
               href="/my-courses"
-              className="text-indigo-600 hover:text-indigo-900"
+              className="text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-2 hover:-translate-x-0.5 transition-transform"
             >
-              &larr; Back to My Courses
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to My Courses
             </Link>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="text-red-600 hover:text-red-700 font-medium flex items-center gap-2 hover:translate-x-0.5 transition-transform"
+            >
+              <TrashIcon className="w-5 h-5" />
+              Delete Course
+            </button>
           </div>
 
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg mb-6">
-            <div className="px-4 py-5 sm:px-6">
-              <h1 className="text-2xl font-semibold text-gray-900">{course.title}</h1>
-              <p className="mt-1 text-sm text-gray-500">{course.description}</p>
-              <div className="mt-2 flex items-center">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white shadow-lg rounded-2xl overflow-hidden mb-6"
+          >
+            <div className="px-6 py-8">
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                {course.title}
+              </h1>
+              <p className="mt-4 text-gray-600 text-lg">{course.description}</p>
+              <div className="mt-6 flex items-center gap-4">
+                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
                   Level: {course.currentLevel}
                 </span>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
                   Skill: {course.targetSkill}
                 </span>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Module navigation */}
-            <div className="lg:w-1/4">
-              <div className="bg-white shadow overflow-hidden sm:rounded-lg sticky top-6">
-                <div className="px-4 py-5 sm:px-6">
-                  <h2 className="text-lg font-medium text-gray-900">Modules</h2>
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="lg:w-1/4"
+            >
+              <div className="bg-white shadow-lg rounded-2xl overflow-hidden sticky top-6">
+                <div className="px-6 py-4 border-b border-gray-100">
+                  <h2 className="text-lg font-semibold text-gray-900">Modules</h2>
                 </div>
-                <div className="border-t border-gray-200">
-                  <ul className="divide-y divide-gray-200">
-                    {course.learningPath.modules.map((module, index) => (
-                      <li key={index}>
-                        <button
-                          onClick={() => handleModuleChange(index)}
-                          className={`w-full text-left px-4 py-3 flex items-center ${
-                            activeModule === index
-                              ? 'bg-indigo-50 text-indigo-700'
-                              : 'text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          <span className="mr-2 flex-shrink-0 bg-indigo-100 text-indigo-800 text-xs font-medium rounded-full h-6 w-6 flex items-center justify-center">
-                            {index + 1}
-                          </span>
-                          <span className="text-sm font-medium truncate">
-                            {module.title}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                <nav className="p-4">
+                  {course.learningPath.modules.map((module, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleModuleChange(index)}
+                      className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 ${
+                        activeModule === index
+                          ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                          : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="text-sm font-medium">Module {index + 1}</span>
+                      <p className={`text-sm ${activeModule === index ? 'text-white/90' : 'text-gray-500'}`}>
+                        {module.title}
+                      </p>
+                    </button>
+                  ))}
+                </nav>
               </div>
-            </div>
+            </motion.div>
 
             {/* Module content */}
-            <div className="lg:w-3/4">
-              <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-                <div className="px-4 py-5 sm:px-6">
-                  <h2 className="text-xl font-medium text-gray-900">
-                    {course.learningPath.modules[activeModule].title}
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {course.learningPath.modules[activeModule].description}
-                  </p>
-                </div>
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="lg:w-3/4"
+            >
+              <div className="bg-white shadow-lg rounded-2xl overflow-hidden">
+                <AnimatePresence mode="wait">
+                  {course.learningPath.modules.map((module, index) => (
+                    activeModule === index && (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="p-6"
+                      >
+                        <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                          {module.title}
+                        </h2>
+                        <p className="text-gray-600 mb-8">{module.description}</p>
 
-                {/* Resources */}
-                <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Resources</h3>
-                  <div className="space-y-4">
-                    {course.learningPath.modules[activeModule].resources.map((resource, idx) => (
-                      <div key={idx} className="border border-gray-200 rounded-md p-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="text-md font-medium text-gray-900">{resource.title}</h4>
-                            <p className="mt-1 text-sm text-gray-500">{resource.description}</p>
-                          </div>
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                            {resource.type}
-                          </span>
-                        </div>
-                        {resource.url && (
-                          <div className="mt-2">
-                            <a
-                              href={resource.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
-                            >
-                              View Resource &rarr;
-                            </a>
+                        {module.resources.length > 0 && (
+                          <div className="mb-8">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Resources</h3>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                              {module.resources.map((resource, rIndex) => (
+                                <motion.div
+                                  key={rIndex}
+                                  initial={{ opacity: 0, y: 10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ delay: rIndex * 0.1 }}
+                                  className="bg-gray-50 rounded-xl p-4 hover:shadow-md transition-shadow"
+                                >
+                                  {resource.url ? (
+                                    <a
+                                      href={resource.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-indigo-600 hover:text-indigo-700 font-medium block mb-2"
+                                    >
+                                      {resource.title}
+                                    </a>
+                                  ) : (
+                                    <h4 className="font-medium text-gray-900 mb-2">{resource.title}</h4>
+                                  )}
+                                  <p className="text-sm text-gray-600">{resource.description}</p>
+                                </motion.div>
+                              ))}
+                            </div>
                           </div>
                         )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
 
-                {/* Assessment */}
-                {course.learningPath.modules[activeModule].assessment && (
-                  <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
-                    <div className="flex justify-between items-center mb-3">
-                      <h3 className="text-lg font-medium text-gray-900">Assessment</h3>
-                      <button
-                        onClick={handleShowAnswers}
-                        className="text-sm text-indigo-600 hover:text-indigo-900"
-                      >
-                        {showingAnswers ? 'Hide Answers' : 'Show Answers'}
-                      </button>
-                    </div>
-                    
-                    <div className="space-y-6">
-                      {course.learningPath.modules[activeModule].assessment?.questions.map((question, qIdx) => (
-                        <div key={qIdx} className="border border-gray-200 rounded-md p-4">
-                          <h4 className="text-md font-medium text-gray-900 mb-3">
-                            {qIdx + 1}. {question.question}
-                          </h4>
-                          
-                          {question.options && (
-                            <ul className="space-y-2">
-                              {question.options.map((option, oIdx) => (
-                                <li key={oIdx} className="flex items-start">
-                                  <div className={`
-                                    flex-shrink-0 h-5 w-5 border border-gray-300 rounded-full mr-2
-                                    ${showingAnswers && option === question.correctAnswer
-                                      ? 'bg-green-500 border-green-500' 
-                                      : ''
-                                    }
-                                  `}></div>
-                                  <span className={`text-sm ${
-                                    showingAnswers && option === question.correctAnswer
-                                      ? 'font-medium text-green-700'
-                                      : 'text-gray-700'
-                                  }`}>
-                                    {option}
-                                  </span>
-                                </li>
+                        {module.assessment && (
+                          <div>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Assessment</h3>
+                            <div className="space-y-6">
+                              {module.assessment.questions.map((question, qIndex) => (
+                                <div key={qIndex} className="bg-gray-50 rounded-xl p-6">
+                                  <p className="text-gray-900 font-medium mb-4">{question.question}</p>
+                                  {question.options && (
+                                    <div className="space-y-2">
+                                      {question.options.map((option, oIndex) => (
+                                        <div
+                                          key={oIndex}
+                                          className={`p-3 rounded-lg ${
+                                            showingAnswers && option === question.correctAnswer
+                                              ? 'bg-green-100 text-green-800'
+                                              : 'bg-white text-gray-600'
+                                          }`}
+                                        >
+                                          {option}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
                               ))}
-                            </ul>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Feedback form */}
-                <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Your Feedback</h3>
-                  <form onSubmit={handleFeedbackSubmit}>
-                    <div className="mb-4">
-                      <label htmlFor="rating" className="block text-sm font-medium text-gray-700 mb-1">
-                        Rate this module:
-                      </label>
-                      {renderRatingInput()}
-                    </div>
-                    
-                    <div className="mb-4">
-                      <label htmlFor="comment" className="block text-sm font-medium text-gray-700 mb-1">
-                        Your comments:
-                      </label>
-                      <textarea
-                        id="comment"
-                        rows={3}
-                        className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border border-gray-300 rounded-md"
-                        value={feedback.comment}
-                        onChange={(e) => setFeedback({ ...feedback, comment: e.target.value })}
-                        placeholder="What did you like? What could be improved?"
-                      ></textarea>
-                    </div>
-                    
-                    <button
-                      type="submit"
-                      className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      Submit Feedback
-                    </button>
-                  </form>
-                </div>
+                            </div>
+                            <button
+                              onClick={() => setShowingAnswers(!showingAnswers)}
+                              className="mt-6 px-6 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200"
+                            >
+                              {showingAnswers ? 'Hide Answers' : 'Show Answers'}
+                            </button>
+                          </div>
+                        )}
+                      </motion.div>
+                    )
+                  ))}
+                </AnimatePresence>
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
       </div>
+
+      {/* Delete confirmation modal */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white rounded-2xl p-6 max-w-md mx-4 shadow-xl"
+            >
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Delete Course</h3>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete this course? This action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-4">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-4 py-2 rounded-lg text-gray-600 hover:bg-gray-50 font-medium"
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteCourse}
+                  disabled={deleting}
+                  className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 font-medium flex items-center gap-2"
+                >
+                  {deleting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/20 border-b-white"></div>
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <TrashIcon className="w-4 h-4" />
+                      Delete Course
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

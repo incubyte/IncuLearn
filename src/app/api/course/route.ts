@@ -1,101 +1,32 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { generateLearningPath } from '@/lib/openai';
-import { connectToDatabase } from '@/lib/mongodb';
-import Course from '@/models/Course';
+import { NextRequest } from 'next/server';
+import { saveCourse, getUserCourses } from '@/services/course.service';
+import { Course } from '@/types';
+import { successResponse, errorResponse } from '@/lib/api-utils';
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId, title, description, currentLevel, targetSkill, conversation } = await req.json();
+    const courseData = await req.json() as Course;
 
     // Validate required fields
-    if (!userId || !title || !description || !currentLevel || !targetSkill || !conversation) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
+    const requiredFields = ['userId', 'title', 'description', 'currentLevel', 'targetSkill', 'learningPath'];
+    const missingFields = requiredFields.filter(field => !courseData[field as keyof Course]);
+
+    if (missingFields.length > 0) {
+      return errorResponse(`Missing required fields: ${missingFields.join(', ')}`, 400);
     }
 
-    // Format conversation for OpenAI
-    const messages = [
-      {
-        role: 'system',
-        content: `You are an expert educational AI assistant. Create a personalized learning path for a student based 
-        on their current level (${currentLevel}) and their target skill (${targetSkill}). 
-        The learning path should include modules with clear titles, descriptions, and curated resources.
-        Each module should also include assessment questions.
-        Format your response as a JSON object with the following structure:
-        {
-          "modules": [
-            {
-              "title": "Module title",
-              "description": "Module description",
-              "resources": [
-                {
-                  "type": "article/video/book/exercise", 
-                  "title": "Resource title", 
-                  "url": "optional url", 
-                  "description": "Why this resource is helpful"
-                }
-              ],
-              "assessment": {
-                "questions": [
-                  {
-                    "question": "Assessment question?",
-                    "options": ["option1", "option2", "option3", "option4"],
-                    "correctAnswer": "correct option"
-                  }
-                ]
-              }
-            }
-          ]
-        }`,
-      },
-      ...conversation,
-    ];
-
-    // Generate learning path from OpenAI
-    const learningPathResponse = await generateLearningPath(messages);
-    
-    // Parse the response
-    let learningPath;
-    try {
-      // The AI might return markdown code blocks or additional text, so we need to extract just the JSON
-      const jsonMatch = learningPathResponse.match(/\{[\s\S]*\}/);
-      const jsonString = jsonMatch ? jsonMatch[0] : learningPathResponse;
-      learningPath = JSON.parse(jsonString);
-    } catch (error) {
-      console.error('Failed to parse learning path JSON:', error);
-      return NextResponse.json(
-        { error: 'Failed to parse AI response' },
-        { status: 500 }
-      );
+    // Validate learningPath structure
+    if (!courseData.learningPath?.modules || !Array.isArray(courseData.learningPath.modules)) {
+      return errorResponse('Invalid learning path structure', 400);
     }
 
-    // Connect to database
-    await connectToDatabase();
+    // Save course
+    const newCourse = await saveCourse(courseData);
 
-    // Create new course
-    const newCourse = new Course({
-      userId,
-      title,
-      description,
-      currentLevel,
-      targetSkill,
-      learningPath,
-    });
-
-    await newCourse.save();
-
-    return NextResponse.json(
-      { success: true, course: newCourse },
-      { status: 201 }
-    );
+    return successResponse({ course: newCourse }, 201);
   } catch (error) {
-    console.error('Error creating course:', error);
-    return NextResponse.json(
-      { error: 'Failed to create course' },
-      { status: 500 }
-    );
+    const errorMessage = error instanceof Error ? error.message : 'Failed to create course';
+    return errorResponse(errorMessage, 500);
   }
 }
 
@@ -105,21 +36,14 @@ export async function GET(req: NextRequest) {
     const userId = searchParams.get('userId');
 
     if (!userId) {
-      return NextResponse.json(
-        { error: 'Missing userId parameter' },
-        { status: 400 }
-      );
+      return errorResponse('Missing userId parameter', 400);
     }
 
-    await connectToDatabase();
-    const courses = await Course.find({ userId }).sort({ createdAt: -1 });
+    const courses = await getUserCourses(userId);
 
-    return NextResponse.json({ courses }, { status: 200 });
+    return successResponse({ courses });
   } catch (error) {
-    console.error('Error fetching courses:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch courses' },
-      { status: 500 }
-    );
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch courses';
+    return errorResponse(errorMessage, 500);
   }
 }

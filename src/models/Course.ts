@@ -1,41 +1,41 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
+import { Course, Module, Resource, AssessmentQuestion, Feedback } from '@/types';
 
-export interface ICourse extends Document {
-  userId: string;
-  title: string;
-  description: string;
-  currentLevel: string;
-  targetSkill: string;
-  learningPath: {
-    modules: Array<{
-      title: string;
-      description: string;
-      resources: Array<{
-        type: string;
-        title: string;
-        url?: string;
-        description: string;
-      }>;
-      assessment?: {
-        questions: Array<{
-          question: string;
-          options?: string[];
-          correctAnswer?: string;
-        }>;
-      };
-    }>;
-  };
-  createdAt: Date;
-  updatedAt: Date;
-  feedback?: Array<{
-    moduleIndex: number;
-    comment: string;
-    rating: number;
-    createdAt: Date;
-  }>;
-}
+// Create schemas for nested types
+const ResourceSchema = new Schema<Resource>({
+  type: { type: String, required: true },
+  title: { type: String, required: true },
+  url: { type: String },
+  description: { type: String, required: true },
+  estimatedMinutes: { type: String },
+});
 
-const CourseSchema: Schema = new Schema(
+const AssessmentQuestionSchema = new Schema<AssessmentQuestion>({
+  question: { type: String, required: true },
+  options: [{ type: String }],
+  correctAnswer: { type: String },
+});
+
+const ModuleSchema = new Schema<Module>({
+  title: { type: String, required: true },
+  description: { type: String, required: true },
+  estimatedHours: { type: String },
+  resources: [ResourceSchema],
+  assessment: {
+    questions: [AssessmentQuestionSchema],
+  },
+  isFinalized: { type: Boolean, default: false }
+});
+
+const FeedbackSchema = new Schema<Feedback>({
+  moduleIndex: { type: Number, required: true },
+  comment: { type: String, required: true },
+  rating: { type: Number, required: true, min: 1, max: 5 },
+  createdAt: { type: Date, default: Date.now },
+});
+
+// Main Course schema
+const CourseSchema = new Schema<Course>(
   {
     userId: { type: String, required: true },
     title: { type: String, required: true },
@@ -43,42 +43,15 @@ const CourseSchema: Schema = new Schema(
     currentLevel: { type: String, required: true },
     targetSkill: { type: String, required: true },
     learningPath: {
-      modules: [
-        {
-          title: { type: String, required: true },
-          description: { type: String, required: true },
-          resources: [
-            {
-              type: { type: String, required: true },
-              title: { type: String, required: true },
-              url: { type: String },
-              description: { type: String, required: true },
-            },
-          ],
-          assessment: {
-            questions: [
-              {
-                question: { type: String, required: true },
-                options: [{ type: String }],
-                correctAnswer: { type: String },
-              },
-            ],
-          },
-        },
-      ],
+      modules: [ModuleSchema],
+      estimatedTotalHours: { type: String },
     },
-    feedback: [
-      {
-        moduleIndex: { type: Number, required: true },
-        comment: { type: String, required: true },
-        rating: { type: Number, required: true, min: 1, max: 5 },
-        createdAt: { type: Date, default: Date.now },
-      },
-    ],
+    feedback: [FeedbackSchema],
   },
   {
     timestamps: true,
   }
 );
 
-export default mongoose.models.Course || mongoose.model<ICourse>('Course', CourseSchema);
+// Export the model, handling potential model redefinition
+export default mongoose.models.Course || mongoose.model<Course>('Course', CourseSchema);

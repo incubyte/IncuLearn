@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { getCourseById, addFeedback } from '@/services/course.service';
 import { connectToDatabase } from '@/lib/mongodb';
 import Course from '@/models/Course';
+import { successResponse, errorResponse } from '@/lib/api-utils';
 
 export async function GET(
   req: NextRequest,
@@ -8,24 +10,21 @@ export async function GET(
 ) {
   try {
     const courseId = params.id;
-    
-    await connectToDatabase();
-    const course = await Course.findById(courseId);
 
-    if (!course) {
-      return NextResponse.json(
-        { error: 'Course not found' },
-        { status: 404 }
-      );
+    if (!courseId) {
+      return errorResponse('Missing course ID', 400);
     }
 
-    return NextResponse.json({ course }, { status: 200 });
+    const course = await getCourseById(courseId);
+
+    if (!course) {
+      return errorResponse('Course not found', 404);
+    }
+
+    return successResponse({ course });
   } catch (error) {
-    console.error('Error fetching course:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch course' },
-      { status: 500 }
-    );
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch course';
+    return errorResponse(errorMessage, 500);
   }
 }
 
@@ -35,40 +34,22 @@ export async function PUT(
 ) {
   try {
     const courseId = params.id;
-    const { feedback } = await req.json();
+    const { moduleIndex, comment, rating } = await req.json();
     
-    if (!feedback) {
-      return NextResponse.json(
-        { error: 'Feedback is required' },
-        { status: 400 }
-      );
+    if (moduleIndex === undefined || !comment || !rating) {
+      return errorResponse('Module index, comment, and rating are required', 400);
     }
 
-    await connectToDatabase();
+    const updatedCourse = await addFeedback(courseId, moduleIndex, comment, rating);
     
-    const course = await Course.findById(courseId);
-    
-    if (!course) {
-      return NextResponse.json(
-        { error: 'Course not found' },
-        { status: 404 }
-      );
+    if (!updatedCourse) {
+      return errorResponse('Course not found', 404);
     }
 
-    // Add new feedback to course
-    course.feedback.push(feedback);
-    await course.save();
-
-    return NextResponse.json(
-      { success: true, course },
-      { status: 200 }
-    );
+    return successResponse({ course: updatedCourse });
   } catch (error) {
-    console.error('Error updating course:', error);
-    return NextResponse.json(
-      { error: 'Failed to update course' },
-      { status: 500 }
-    );
+    const errorMessage = error instanceof Error ? error.message : 'Failed to update course';
+    return errorResponse(errorMessage, 500);
   }
 }
 
@@ -77,27 +58,16 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const courseId = params.id;
-    
     await connectToDatabase();
-    const result = await Course.findByIdAndDelete(courseId);
+    const course = await Course.findByIdAndDelete(params.id);
 
-    if (!result) {
-      return NextResponse.json(
-        { error: 'Course not found' },
-        { status: 404 }
-      );
+    if (!course) {
+      return errorResponse('Course not found', 404);
     }
 
-    return NextResponse.json(
-      { success: true, message: 'Course deleted successfully' },
-      { status: 200 }
-    );
+    return successResponse({ message: 'Course deleted successfully' });
   } catch (error) {
-    console.error('Error deleting course:', error);
-    return NextResponse.json(
-      { error: 'Failed to delete course' },
-      { status: 500 }
-    );
+    const errorMessage = error instanceof Error ? error.message : 'Failed to delete course';
+    return errorResponse(errorMessage, 500);
   }
 }
