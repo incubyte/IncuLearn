@@ -11,33 +11,46 @@ interface MongooseCache {
   promise: Promise<typeof mongoose> | null;
 }
 
-// Use a properly typed global cache
-declare global {
-  // eslint-disable-next-line no-var
-  var mongooseCache: MongooseCache | undefined;
-}
-
-let cached = global.mongooseCache;
-
-if (!cached) {
-  cached = global.mongooseCache = { conn: null, promise: null };
+// Initialize the cache
+const globalCache: { mongooseCache: MongooseCache } = global as any;
+if (!globalCache.mongooseCache) {
+  globalCache.mongooseCache = {
+    conn: null,
+    promise: null,
+  };
 }
 
 export async function connectToDatabase(): Promise<typeof mongoose> {
-  if (cached.conn) {
-    return cached.conn;
-  }
+  try {
+    const cache = globalCache.mongooseCache;
 
-  if (!cached.promise) {
-    const opts = {
-      bufferCommands: false,
-    };
+    if (cache.conn) {
+      console.log('Using cached database connection');
+      return cache.conn;
+    }
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
-      return mongoose;
-    });
+    if (!cache.promise) {
+      console.log('Creating new database connection');
+      const opts = {
+        bufferCommands: false,
+      };
+
+      cache.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
+        console.log('Successfully connected to MongoDB');
+        return mongoose;
+      });
+    }
+    
+    try {
+      cache.conn = await cache.promise;
+      return cache.conn;
+    } catch (error) {
+      cache.promise = null;
+      console.error('Error connecting to MongoDB:', error);
+      throw error;
+    }
+  } catch (error) {
+    console.error('Error in connectToDatabase:', error);
+    throw new Error('Failed to connect to database');
   }
-  
-  cached.conn = await cached.promise;
-  return cached.conn;
 }

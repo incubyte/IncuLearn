@@ -129,10 +129,34 @@ export async function generateCourse(request: GenerateCourseRequest): Promise<{ 
  * Saves a course to the database
  */
 export async function saveCourse(course: Course): Promise<Course> {
-  await connectToDatabase();
-  const newCourse = new CourseModel(course);
-  const savedCourse = await newCourse.save();
-  return savedCourse.toObject();
+  try {
+    console.log('Connecting to database...');
+    await connectToDatabase();
+    console.log('Connected to database');
+
+    console.log('Creating new course model...');
+    const newCourse = new CourseModel(course);
+    
+    console.log('Validating course data...');
+    await newCourse.validate();
+    
+    console.log('Saving course to database...');
+    const savedCourse = await newCourse.save();
+    console.log('Course saved successfully');
+    
+    return savedCourse.toObject();
+  } catch (error) {
+    console.error('Error saving course:', error);
+    if (error instanceof Error) {
+      if (error.name === 'ValidationError') {
+        throw new Error(`Course validation failed: ${error.message}`);
+      }
+      if (error.name === 'MongoServerError' && (error as any).code === 11000) {
+        throw new Error('A course with this ID already exists');
+      }
+    }
+    throw new Error('Failed to save course to database');
+  }
 }
 
 /**

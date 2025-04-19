@@ -12,6 +12,7 @@ interface Resource {
   title: string;
   url?: string;
   description: string;
+  estimatedMinutes?: string;
 }
 
 interface Question {
@@ -23,6 +24,7 @@ interface Question {
 interface Module {
   title: string;
   description: string;
+  estimatedHours?: string;
   resources: Resource[];
   assessment?: {
     questions: Question[];
@@ -38,6 +40,7 @@ interface Course {
   targetSkill: string;
   learningPath: {
     modules: Module[];
+    estimatedTotalHours?: string;
   };
   createdAt: string;
   updatedAt: string;
@@ -72,17 +75,27 @@ export default function CourseDetail() {
     const fetchCourse = async () => {
       try {
         setLoading(true);
+        console.log('Fetching course with ID:', courseId);
+        
+        // Fetch from a different route - fetch a single course by ID
+        // This should point to an API route that gets course by courseId, not userId
         const response = await axios.get(`/api/course/${courseId}`);
-        setCourse(response.data.course);
+        
+        console.log('Course response:', response.data);
+        
+        // Nested data structure from API
+        setCourse(response.data.data?.course);
         setLoading(false);
       } catch (err) {
         setError('Failed to fetch course details. Please try again later.');
-        console.error(err);
+        console.error('Error fetching course:', err);
         setLoading(false);
       }
     };
 
-    fetchCourse();
+    if (courseId) {
+      fetchCourse();
+    }
   }, [courseId]);
 
   const handleDeleteCourse = async () => {
@@ -217,13 +230,31 @@ export default function CourseDetail() {
                 {course.title}
               </h1>
               <p className="mt-4 text-gray-600 text-lg">{course.description}</p>
-              <div className="mt-6 flex items-center gap-4">
+              <div className="mt-6 flex flex-wrap items-center gap-4">
                 <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
                   Level: {course.currentLevel}
                 </span>
                 <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
                   Skill: {course.targetSkill}
                 </span>
+                {course.learningPath.estimatedTotalHours && (
+                  <span className="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                    <svg 
+                      className="w-4 h-4 mr-1" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth={2} 
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" 
+                      />
+                    </svg>
+                    Estimated: {course.learningPath.estimatedTotalHours} hours
+                  </span>
+                )}
               </div>
             </div>
           </motion.div>
@@ -277,9 +308,29 @@ export default function CourseDetail() {
                         exit={{ opacity: 0, y: -20 }}
                         className="p-6"
                       >
-                        <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                        <h2 className="text-2xl font-bold text-gray-900 mb-2">
                           {module.title}
                         </h2>
+                        
+                        {module.estimatedHours && (
+                          <div className="flex items-center gap-2 text-indigo-600 font-medium mb-2">
+                            <svg 
+                              className="w-5 h-5" 
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
+                              <path 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round" 
+                                strokeWidth={2} 
+                                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" 
+                              />
+                            </svg>
+                            <span>Estimated time: {module.estimatedHours} hours</span>
+                          </div>
+                        )}
+                        
                         <p className="text-gray-600 mb-8">{module.description}</p>
 
                         {module.resources.length > 0 && (
@@ -306,7 +357,26 @@ export default function CourseDetail() {
                                   ) : (
                                     <h4 className="font-medium text-gray-900 mb-2">{resource.title}</h4>
                                   )}
-                                  <p className="text-sm text-gray-600">{resource.description}</p>
+                                  <p className="text-sm text-gray-600 mb-2">{resource.description}</p>
+                                  
+                                  {resource.estimatedMinutes && (
+                                    <div className="flex items-center gap-1 text-xs text-indigo-600 font-medium mt-2">
+                                      <svg 
+                                        className="w-4 h-4" 
+                                        fill="none" 
+                                        stroke="currentColor" 
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path 
+                                          strokeLinecap="round" 
+                                          strokeLinejoin="round" 
+                                          strokeWidth={2} 
+                                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" 
+                                        />
+                                      </svg>
+                                      <span>{resource.estimatedMinutes} minutes</span>
+                                    </div>
+                                  )}
                                 </motion.div>
                               ))}
                             </div>

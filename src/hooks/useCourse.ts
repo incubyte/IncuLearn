@@ -7,7 +7,7 @@ interface UseCourseParams {
 
 export function useCourse({ initialCourse = {} }: UseCourseParams = {}) {
   // Use a temporary user ID (would normally come from authentication)
-  const [userId] = useState<string>('temp-user-id-123');
+  const [userId] = useState<string>('user123');
   
   // Course state
   const [title, setTitle] = useState<string>(initialCourse.title || '');

@@ -16,6 +16,7 @@ interface Resource {
 interface Module {
   title: string;
   description: string;
+  estimatedHours?: string;
   resources: Resource[];
 }
 
@@ -27,6 +28,7 @@ interface Course {
   targetSkill: string;
   learningPath: {
     modules: Module[];
+    estimatedTotalHours?: string;
   };
   createdAt: string;
 }
@@ -42,11 +44,17 @@ export default function MyCourses() {
   useEffect(() => {
     const fetchCourses = async () => {
       try {
-        const response = await axios.get(`/api/course?userId=${tempUserId}`);
-        setCourses(response.data.courses || []);
+        // Use the userId route parameter instead of query parameter
+        const response = await axios.get(`/api/course/${tempUserId}`);
+        
+        // Log response for debugging
+        console.log('API response:', response.data);
+        
+        // The API returns nested data structure - data.data.courses
+        setCourses(response.data.data?.courses || []);
       } catch (err) {
         setError('Failed to fetch your courses. Please try again later.');
-        console.error(err);
+        console.error('Error fetching courses:', err);
       } finally {
         setLoading(false);
       }
@@ -184,7 +192,7 @@ export default function MyCourses() {
                       </span>
                     </div>
                     
-                    <div className="flex items-center gap-6 text-sm text-gray-500 mb-8">
+                    <div className="flex flex-col gap-3 text-sm text-gray-500 mb-8">
                       <div className="flex items-center gap-2">
                         <ClockIcon className="w-5 h-5" />
                         <span>Created on: {new Date(course.createdAt).toLocaleDateString()} at {new Date(course.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
@@ -193,6 +201,12 @@ export default function MyCourses() {
                         <ChartBarIcon className="w-5 h-5" />
                         <span>{course.learningPath.modules.length} modules</span>
                       </div>
+                      {course.learningPath.estimatedTotalHours && (
+                        <div className="flex items-center gap-2 text-purple-600 font-medium">
+                          <ClockIcon className="w-5 h-5" />
+                          <span>Estimated completion: {course.learningPath.estimatedTotalHours} hours</span>
+                        </div>
+                      )}
                     </div>
                     
                     <Link

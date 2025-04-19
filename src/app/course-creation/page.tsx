@@ -170,7 +170,7 @@ export default function CourseCreation() {
       const targetSkill = userMessages[0].content;
 
       // Filter out finalized modules from being updated
-      const currentModules = course?.learningPath.modules
+      const currentModules = course?.learningPath.modules;
 
       // Call the API to generate/update the course
       const response = await axios.post('/api/course/generate', {
@@ -180,9 +180,17 @@ export default function CourseCreation() {
         currentModules
       });
 
+      // Ensure we have a valid response with course data
+      if (!response.data?.course) {
+        throw new Error('Invalid response: Missing course data');
+      }
+
+      // Ensure learningPath exists with default values if missing
+      const learningPath = response.data.course.learningPath || { modules: [], estimatedTotalHours: '0' };
+
       // Merge the new modules with finalized ones
       if (course) {
-        const newModules = response.data.course.learningPath.modules;
+        const newModules = learningPath.modules;
         // First, create a copy of the current modules to preserve them all
         const mergedModules = [...course.learningPath.modules];
         
@@ -202,30 +210,36 @@ export default function CourseCreation() {
           ...response.data.course,
           learningPath: { 
             modules: mergedModules,
-            estimatedTotalHours: response.data.course.learningPath.estimatedTotalHours
+            estimatedTotalHours: learningPath.estimatedTotalHours
           }
         });
       } else {
         // For initial course creation, mark all modules as non-finalized
-        const modulesWithFinalized = response.data.course.learningPath.modules.map(
-          module => ({ ...module, isFinalized: false })
+        const modulesWithFinalized = learningPath.modules.map(
+          (module: Module) => ({ ...module, isFinalized: false })
         );
         setCourse({
           ...response.data.course,
           learningPath: { 
             modules: modulesWithFinalized,
-            estimatedTotalHours: response.data.course.learningPath.estimatedTotalHours
+            estimatedTotalHours: learningPath.estimatedTotalHours
           }
         });
       }
       
       // Add the follow-up question to the chat
-      const followUpMessage: Message = {
-        role: 'assistant',
-        content: response.data.followUpQuestion
-      };
-      
-      setMessages((prev) => [...prev, followUpMessage]);
+      if (response.data.followUpQuestion) {
+        const followUpMessage: Message = {
+          role: 'assistant',
+          content: response.data.followUpQuestion
+        };
+        setMessages((prev) => [...prev, followUpMessage]);
+      } else {
+        setMessages((prev) => [...prev, {
+          role: 'assistant',
+          content: 'I\'ve updated your learning path. Do you have any questions about the modules?'
+        }]);
+      }
     } catch (error) {
       console.error('Error:', error);
       setMessages((prev) => [
